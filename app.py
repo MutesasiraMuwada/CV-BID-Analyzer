@@ -1,57 +1,74 @@
 import streamlit as st
-import requests
 import pdfplumber
 import docx2txt
 import io
+import requests
 
-st.title("📄 CV-Bid Analyzer")
+# Set page configuration
+st.set_page_config(page_title="CV-Bid Analyzer", layout="centered")
 
+# Hugging Face Inference API token from Streamlit secrets
 HUGGINGFACE_TOKEN = st.secrets["huggingface"]["token"]
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
 
 def query_llm(prompt):
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
     headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
-    payload = {"inputs": prompt}
+    payload = {
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": 1024}
+    }
     response = requests.post(API_URL, headers=headers, json=payload)
-    return response.json()
 
-def read_file(file, filename):
+    try:
+        result = response.json()
+        return result[0]["generated_text"] if isinstance(result, list) else result.get("generated_text", "No response.")
+    except requests.exceptions.JSONDecodeError:
+        st.error("Error decoding model response. Please check your Hugging Face model/token.")
+        st.stop()
+
+def extract_text(file, filename):
     if filename.endswith(".pdf"):
-        with pdfplumber.open(file) as pdf:
-            return "\n".join(p.extract_text() for p in pdf.pages if p.extract_text())
+        with pdfplumber.open(io.BytesIO(file.read())) as pdf:
+            return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
     elif filename.endswith(".docx"):
-        return docx2txt.process(file)
+        return docx2txt.process(io.BytesIO(file.read()))
     return ""
 
-st.subheader("1. Upload Your CV (PDF or DOCX)")
-cv_file = st.file_uploader("Upload CV", type=["pdf", "docx"])
+# UI layout
+st.title("📄 CV-Bid Analyzer")
+st.markdown("Upload your CV and a Bid Description to get an AI-powered analysis.")
 
-st.subheader("2. Upload Bid Document (PDF or DOCX)")
-bid_file = st.file_uploader("Upload Bid", type=["pdf", "docx"])
+cv_file = st.file_uploader("1. Upload Your CV (PDF or DOCX)", type=["pdf", "docx"])
+bid_file = st.file_uploader("2. Upload Bid Document (PDF or DOCX)", type=["pdf", "docx"])
 
-if st.button("🔍 Analyze") and cv_file and bid_file:
-    with st.spinner("Processing..."):
-        cv_text = read_file(cv_file, cv_file.name)
-        bid_text = read_file(bid_file, bid_file.name)
+if st.button("🔍 Analyze CV vs Bid"):
+    if not cv_file or not bid_file:
+        st.warning("Please upload both files.")
+    else:
+        cv_text = extract_text(cv_file, cv_file.name)
+        bid_text = extract_text(bid_file, bid_file.name)
 
-        prompt = f"""[INST]Analyze this CV against the job requirements:
-
-        JOB DESCRIPTION:
-        {bid_text[:2000]}
-
-        CANDIDATE CV:
-        {cv_text[:2000]}
-
-        Provide:
-        1. Match percentage (0–100%)
-        2. Top 3 strengths
-        3. Top 3 missing qualifications
-        4. Improvement suggestions
-        Format in markdown.[/INST]"""
-
-        result = query_llm(prompt)
-        st.subheader("📝 CV Analysis Result")
-        if isinstance(result, list):
-            st.markdown(result[0]["generated_text"])
+        if not cv_text.strip() or not bid_text.strip():
+            st.error("One or both documents seem empty. Please try again.")
         else:
-            st.error("Something went wrong.")
+            with st.spinner("Analyzing with Mistral-7B..."):
+                prompt = f"""
+                [INST]Analyze this CV against the job requirements:
+
+                JOB DESCRIPTION:
+                {bid_text[:2000]}
+
+                CANDIDATE CV:
+                {cv_text[:2000]}
+
+                Provide:
+                1. Match percentage (0-100%)
+                2. Top 3 strengths
+                3. Top 3 missing qualifications
+                4. Improvement suggestions
+
+                Format as markdown.[/INST]
+                """
+                result = query_llm(prompt)
+                st.success("✅ Analysis Complete")
+                st.markdown(result)
