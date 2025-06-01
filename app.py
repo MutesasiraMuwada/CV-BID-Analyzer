@@ -11,7 +11,7 @@ st.title("📄 CV-Bid Analyzer (Powered by Hugging Face)")
 API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
 headers = {
-    "Authorization": f"Bearer {st.secrets['huggingface']['token']}"
+    "Authorization": f"Bearer {st.secrets['hf_token']}"
 }
 
 # Upload CV
