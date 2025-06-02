@@ -5,7 +5,7 @@ import io
 import requests
 
 # App title
-st.title("📄 CV-BID ANALYSER FOR KNOWLEDGE CONSULTANT LIMITED)")
+st.title("📄 CV-BID ANALYSER)")
 
 # Hugging Face inference API setup
 API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
