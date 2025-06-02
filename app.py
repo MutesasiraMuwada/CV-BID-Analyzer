@@ -9,9 +9,8 @@ st.title("📄 CV-BID ANALYSER FOR KNOWLEDGE CONSULTANT LIMITED)")
 
 # Hugging Face inference API setup
 API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-
 headers = {
-    "Authorization": f"Bearer {st.secrets['hf_token']}"
+    "Authorization": f"Bearer {st.secrets['huggingface']['token']}"  # Safely loads from secrets.toml
 }
 
 # Upload CV
